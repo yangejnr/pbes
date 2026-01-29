@@ -1,0 +1,6 @@
+@PbesApi_HostAddress = http://localhost:5288
+
+GET {{PbesApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
