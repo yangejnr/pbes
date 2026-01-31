@@ -9,6 +9,11 @@ export type HsCodeMatch = {
   description: string;
   matchPercent: number;
   comment: string;
+  subsections: {
+    hsCode: string;
+    title: string;
+    notes: string;
+  }[];
 };
 
 export type RecentHsCode = {

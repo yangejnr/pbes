@@ -60,9 +60,24 @@ public class OllamaClient : IOllamaClient
                             ["hsCode"] = new Dictionary<string, object?> { ["type"] = "string" },
                             ["description"] = new Dictionary<string, object?> { ["type"] = "string" },
                             ["matchPercent"] = new Dictionary<string, object?> { ["type"] = "number" },
-                            ["comment"] = new Dictionary<string, object?> { ["type"] = "string" }
+                            ["comment"] = new Dictionary<string, object?> { ["type"] = "string" },
+                            ["subsections"] = new Dictionary<string, object?>
+                            {
+                                ["type"] = "array",
+                                ["items"] = new Dictionary<string, object?>
+                                {
+                                    ["type"] = "object",
+                                    ["properties"] = new Dictionary<string, object?>
+                                    {
+                                        ["hsCode"] = new Dictionary<string, object?> { ["type"] = "string" },
+                                        ["title"] = new Dictionary<string, object?> { ["type"] = "string" },
+                                        ["notes"] = new Dictionary<string, object?> { ["type"] = "string" }
+                                    },
+                                    ["required"] = new[] { "hsCode", "title", "notes" }
+                                }
+                            }
                         },
-                        ["required"] = new[] { "hsCode", "description", "matchPercent", "comment" }
+                        ["required"] = new[] { "hsCode", "description", "matchPercent", "comment", "subsections" }
                     }
                 },
                 ["note"] = new Dictionary<string, object?> { ["type"] = "string" }

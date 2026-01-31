@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import logo from "./assets/logo.png";
 import { fetchRecentHsCodes, scanHsCode, type HsCodeMatch, type RecentHsCode } from "./services/api";
 
-const featureCards: { title: string; description: string; icon: JSX.Element }[] = [
+const featureCards: { title: string; description: string; icon: ReactNode }[] = [
   {
     title: "Passenger Risk Screening",
     description: "Identify high-risk profiles with structured checks and alerts.",
@@ -317,7 +317,9 @@ export default function App() {
             <img src={logo} alt="Nigeria Customs Service" className="h-12 w-12 object-contain" />
             <div>
               <p className="text-sm font-semibold text-ncsGreen">Nigeria Customs Service</p>
-              <p className="text-[11px] uppercase tracking-[0.25em] text-neutral-500">PBES Portal</p>
+              <p className="text-[11px] uppercase tracking-[0.25em] text-neutral-500">
+                HS Code Intelligence Tool
+              </p>
             </div>
           </div>
           <nav className="hidden items-center gap-8 text-sm text-neutral-600 md:flex">
@@ -335,14 +337,14 @@ export default function App() {
           <div className="map-bg" aria-hidden="true" />
           <div className="relative z-10 space-y-5">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">
-              Passenger Baggage Examination System
+              NCS HS Code Intelligence Tool
             </p>
             <h1 className="font-serif text-4xl text-ncsGreen md:text-5xl">
-              PASSENGER BAGGAGE EXAMINATION SYSTEM
+              NCS HS CODE INTELLIGENCE TOOL
             </h1>
             <p className="max-w-xl text-base text-neutral-600">
-              Securely track passenger baggage checks with structured inspections, risk flags,
-              and compliance-ready reporting for Nigeria Customs Service operations.
+              AI-powered HS code classification to support Nigeria Customs Service officers with
+              accurate matching, compliance checks, and audit-ready reporting.
             </p>
             <button
               className="rounded-full border-2 border-ncsGreen px-6 py-3 text-sm font-semibold text-ncsGreen transition hover:bg-ncsGreen hover:text-white"
@@ -399,7 +401,7 @@ export default function App() {
       <footer className="fixed bottom-0 left-0 right-0 border-t border-ncsBorder bg-white">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4 text-sm text-neutral-500">
           <div>
-            <span className="font-semibold text-ncsInk">PBES</span> · Nigeria Customs Service
+            <span className="font-semibold text-ncsInk">NCS HS Code Intelligence Tool</span> · Nigeria Customs Service
           </div>
           <div className="flex gap-6">
             <a className="transition hover:text-ncsInk" href="#home">Home</a>
@@ -581,13 +583,9 @@ export default function App() {
                             <td className="px-4 py-3">
                               <button
                                 className="rounded-full border border-ncsGreen px-3 py-1 text-xs font-semibold text-ncsGreen transition hover:bg-ncsGreen hover:text-white"
-                                onClick={() =>
-                                  setSelectedResult((current) =>
-                                    current?.hsCode === result.hsCode ? null : result
-                                  )
-                                }
+                                onClick={() => setSelectedResult(result)}
                               >
-                                {selectedResult?.hsCode === result.hsCode ? "Hide Details" : "View Details"}
+                                View Details
                               </button>
                             </td>
                           </tr>
@@ -595,39 +593,69 @@ export default function App() {
                       </tbody>
                     </table>
                   </div>
-                  {selectedResult ? (
-                    <div className="rounded-2xl border border-ncsBorder bg-white p-4">
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-wide text-neutral-500">HS Code Details</p>
-                          <h5 className="mt-1 text-lg font-semibold text-ncsInk">{selectedResult.hsCode}</h5>
-                        </div>
-                        <button
-                          type="button"
-                          className="rounded-full border border-ncsBorder px-3 py-1 text-xs font-semibold text-neutral-600 transition hover:border-ncsGreen hover:text-ncsGreen"
-                          onClick={() => setSelectedResult(null)}
-                        >
-                          Close Details
-                        </button>
-                      </div>
-                      <div className="mt-4 grid gap-3 text-sm text-neutral-600">
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Description</span>
-                          <p className="mt-1">{selectedResult.description}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Match %</span>
-                          <p className="mt-1 font-semibold text-ncsGreen">{Math.round(selectedResult.matchPercent)}%</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Comment</span>
-                          <p className="mt-1">{selectedResult.comment}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedResult ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setSelectedResult(null)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-ncsBorder bg-white shadow-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-ncsBorder px-6 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-neutral-500">HS Code Details</p>
+                <h3 className="mt-1 font-serif text-xl text-ncsGreen">{selectedResult.hsCode}</h3>
+              </div>
+              <button
+                className="text-xs font-semibold uppercase tracking-widest text-neutral-500 transition hover:text-ncsInk"
+                onClick={() => setSelectedResult(null)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[75vh] overflow-y-auto px-6 py-6 text-sm text-neutral-600">
+              <div className="grid gap-4">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Description</span>
+                  <p className="mt-1">{selectedResult.description}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Match %</span>
+                  <p className="mt-1 font-semibold text-ncsGreen">{Math.round(selectedResult.matchPercent)}%</p>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Comment</span>
+                  <p className="mt-1">{selectedResult.comment}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Sub-sections</span>
+                  {selectedResult.subsections?.length ? (
+                    <div className="mt-3 space-y-3">
+                      {selectedResult.subsections.map((section) => (
+                        <div key={section.hsCode} className="rounded-xl border border-ncsBorder bg-ncsLight p-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="font-semibold text-ncsInk">{section.hsCode}</p>
+                              <p className="text-sm text-ncsInk">{section.title}</p>
+                            </div>
+                          </div>
+                          <p className="mt-2 text-xs text-neutral-500">{section.notes}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-neutral-500">No sub-sections returned.</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>

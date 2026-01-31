@@ -1,6 +1,13 @@
 namespace PbesApi.Models;
 
-public record HsCodeMatch(string HsCode, string Description, double MatchPercent, string Comment);
+public record HsCodeSubsection(string HsCode, string Title, string Notes);
+
+public record HsCodeMatch(
+    string HsCode,
+    string Description,
+    double MatchPercent,
+    string Comment,
+    List<HsCodeSubsection> Subsections);
 
 public record RecentHsCodeEntry(string HsCode, string Description);
 
