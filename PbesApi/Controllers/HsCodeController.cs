@@ -68,31 +68,62 @@ public class HsCodeController : ControllerBase
             }
         }
 
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var job = _scanStore.CreateJob();
 
-        HsCodeModelResponse modelResponse;
-        try
+        _ = Task.Run(async () =>
         {
-            modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, linkedCts.Token);
-        }
-        catch (OperationCanceledException)
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token);
+
+            try
+            {
+                var modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, linkedCts.Token);
+
+                if (modelResponse.Matches.Count > 0)
+                {
+                    var top = modelResponse.Matches[0];
+                    _scanStore.Add(new RecentHsCodeEntry(top.HsCode, top.Description));
+                }
+
+                var response = new HsCodeScanResponse(
+                    modelResponse.Matches,
+                    modelResponse.Note,
+                    _scanStore.GetRecent());
+
+                _scanStore.CompleteJob(job.Id, response);
+            }
+            catch (OperationCanceledException)
+            {
+                _scanStore.FailJob(job.Id, "HS code scan timed out. Try a shorter description or smaller image.");
+            }
+            catch (Exception)
+            {
+                _scanStore.FailJob(job.Id, "HS code scan failed.");
+            }
+        });
+
+        return Accepted(new { jobId = job.Id });
+    }
+
+    [HttpGet("scan/{jobId:guid}")]
+    public IActionResult GetScanStatus(Guid jobId)
+    {
+        if (!_scanStore.TryGetJob(jobId, out var job))
         {
-            return StatusCode(StatusCodes.Status504GatewayTimeout, "HS code scan timed out. Try a shorter description or smaller image.");
+            return NotFound("Scan job not found.");
         }
 
-        if (modelResponse.Matches.Count > 0)
+        if (job.Status == HsCodeScanJobStatus.Completed)
         {
-            var top = modelResponse.Matches[0];
-            _scanStore.Add(new RecentHsCodeEntry(top.HsCode, top.Description));
+            return Ok(new { status = "completed", result = job.Result });
         }
 
-        var response = new HsCodeScanResponse(
-            modelResponse.Matches,
-            modelResponse.Note,
-            _scanStore.GetRecent());
+        if (job.Status == HsCodeScanJobStatus.Failed)
+        {
+            return Ok(new { status = "failed", error = job.Error });
+        }
 
-        return Ok(response);
+        return Ok(new { status = "pending" });
     }
 
     private static bool IsAllowedFileType(string contentType)

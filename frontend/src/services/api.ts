@@ -27,11 +27,22 @@ export type HsCodeScanResponse = {
   recentHsCodes: RecentHsCode[];
 };
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "") || "/api";
+type HsCodeScanJobStart = {
+  jobId: string;
+};
+
+type HsCodeScanJobStatus =
+  | { status: "pending" }
+  | { status: "completed"; result: HsCodeScanResponse }
+  | { status: "failed"; error?: string | null };
+
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "";
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
+
+const withBase = (path: string) => (API_BASE_URL ? `${API_BASE_URL}${path}` : path);
 
 export async function login(serviceNumberOrEmail: string, password: string): Promise<LoginResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  const response = await fetch(withBase(`/api/auth/login`), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -60,7 +71,7 @@ export async function scanHsCode(
     formData.append("file", file);
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/hscode/scan`, {
+  const response = await fetch(withBase(`/api/hscode/scan`), {
     method: "POST",
     body: formData,
     signal
@@ -71,13 +82,59 @@ export async function scanHsCode(
     throw new Error(message || "HS code scan failed.");
   }
 
-  return response.json();
+  const startData = (await response.json()) as HsCodeScanJobStart;
+  if (!startData?.jobId) {
+    throw new Error("HS code scan failed to start.");
+  }
+
+  return pollHsCodeScan(startData.jobId, signal);
 }
 
 export async function fetchRecentHsCodes(): Promise<RecentHsCode[]> {
-  const response = await fetch(`${API_BASE_URL}/api/hscode/recent`);
+  const response = await fetch(withBase(`/api/hscode/recent`));
   if (!response.ok) {
     return [];
   }
   return response.json();
+}
+
+async function pollHsCodeScan(jobId: string, signal?: AbortSignal): Promise<HsCodeScanResponse> {
+  while (true) {
+    const response = await fetch(withBase(`/api/hscode/scan/${jobId}`), { signal });
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || "HS code scan failed.");
+    }
+
+    const status = (await response.json()) as HsCodeScanJobStatus;
+    if (status.status === "completed") {
+      return status.result;
+    }
+    if (status.status === "failed") {
+      throw new Error(status.error || "HS code scan failed.");
+    }
+
+    await sleep(3000, signal);
+  }
+}
+
+function sleep(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => resolve(), delayMs);
+    if (signal) {
+      if (signal.aborted) {
+        window.clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      signal.addEventListener(
+        "abort",
+        () => {
+          window.clearTimeout(timer);
+          reject(new DOMException("Aborted", "AbortError"));
+        },
+        { once: true }
+      );
+    }
+  });
 }

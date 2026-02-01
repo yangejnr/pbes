@@ -6,7 +6,9 @@ namespace PbesApi.Services;
 public class HsCodeScanStore
 {
     private readonly ConcurrentQueue<RecentHsCodeEntry> _recent = new();
+    private readonly ConcurrentDictionary<Guid, HsCodeScanJob> _jobs = new();
     private readonly object _lock = new();
+    private readonly TimeSpan _jobTtl = TimeSpan.FromMinutes(30);
 
     public void Add(RecentHsCodeEntry entry)
     {
@@ -30,6 +32,52 @@ public class HsCodeScanStore
         lock (_lock)
         {
             return _recent.Reverse().ToList();
+        }
+    }
+
+    public HsCodeScanJob CreateJob()
+    {
+        CleanupJobs();
+        var job = new HsCodeScanJob(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        _jobs[job.Id] = job;
+        return job;
+    }
+
+    public bool TryGetJob(Guid jobId, out HsCodeScanJob job)
+    {
+        CleanupJobs();
+        return _jobs.TryGetValue(jobId, out job!);
+    }
+
+    public void CompleteJob(Guid jobId, HsCodeScanResponse response)
+    {
+        if (_jobs.TryGetValue(jobId, out var job))
+        {
+            job.Status = HsCodeScanJobStatus.Completed;
+            job.Result = response;
+            job.CompletedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public void FailJob(Guid jobId, string error)
+    {
+        if (_jobs.TryGetValue(jobId, out var job))
+        {
+            job.Status = HsCodeScanJobStatus.Failed;
+            job.Error = error;
+            job.CompletedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    private void CleanupJobs()
+    {
+        var cutoff = DateTimeOffset.UtcNow - _jobTtl;
+        foreach (var entry in _jobs)
+        {
+            if (entry.Value.CreatedAt < cutoff)
+            {
+                _jobs.TryRemove(entry.Key, out _);
+            }
         }
     }
 }

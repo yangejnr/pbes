@@ -10,6 +10,8 @@ services:
       Ollama__Model: llama3.2-vision
       Ollama__TextModel: llama3:8b
       Ollama__TimeoutSeconds: "300"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - postgres
 
@@ -32,8 +34,6 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
       POSTGRES_DB: pbes
       POSTGRES_USER: postgres

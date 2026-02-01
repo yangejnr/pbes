@@ -101,7 +101,7 @@ public class OllamaClient : IOllamaClient
             {
                 ["temperature"] = 0.2,
                 ["top_p"] = 0.9,
-                ["num_predict"] = 400
+                ["num_predict"] = 200
             }
         };
 
