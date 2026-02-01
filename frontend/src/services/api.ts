@@ -27,8 +27,8 @@ export type HsCodeScanResponse = {
   recentHsCodes: RecentHsCode[];
 };
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:5001";
-const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "");
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const API_BASE_URL = rawBaseUrl.replace(/\/+$/, "") || "/api";
 
 export async function login(serviceNumberOrEmail: string, password: string): Promise<LoginResponse> {
   const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
