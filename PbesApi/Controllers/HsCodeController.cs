@@ -37,6 +37,11 @@ public class HsCodeController : ControllerBase
             return BadRequest("Provide a detailed description or upload a clear image to begin.");
         }
 
+        if (!string.IsNullOrWhiteSpace(description) && !IsGoodsRelated(description))
+        {
+            return BadRequest("This tool only supports HS code classification for goods. Please provide a specific item description.");
+        }
+
         if (!string.IsNullOrWhiteSpace(description) && !IsDescriptionSpecific(description))
         {
             return BadRequest("Please provide a more specific description (material, use, size, brand, etc.).");
@@ -135,6 +140,59 @@ public class HsCodeController : ControllerBase
     {
         var words = description.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return words.Length >= 5 && description.Length >= 25;
+    }
+
+    private static bool IsGoodsRelated(string description)
+    {
+        var text = description.ToLowerInvariant();
+
+        var blockedPhrases = new[]
+        {
+            "weather",
+            "football",
+            "soccer",
+            "match",
+            "scores",
+            "news",
+            "politic",
+            "election",
+            "president",
+            "governor",
+            "import duty",
+            "customs duty",
+            "tariff",
+            "tax rate",
+            "exchange rate",
+            "visa",
+            "passport"
+        };
+
+        foreach (var phrase in blockedPhrases)
+        {
+            if (text.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        var blockedIntents = new[]
+        {
+            "tell me about",
+            "what is",
+            "who is",
+            "how to",
+            "explain"
+        };
+
+        foreach (var phrase in blockedIntents)
+        {
+            if (text.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

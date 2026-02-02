@@ -54,6 +54,36 @@ function isDescriptionSpecific(description: string): boolean {
   return words.length >= 5 && description.trim().length >= 25;
 }
 
+function isGoodsRelatedDescription(description: string): boolean {
+  const text = description.toLowerCase();
+  const blockedPhrases = [
+    "weather",
+    "football",
+    "soccer",
+    "match",
+    "scores",
+    "news",
+    "politic",
+    "election",
+    "president",
+    "governor",
+    "import duty",
+    "customs duty",
+    "tariff",
+    "tax rate",
+    "exchange rate",
+    "visa",
+    "passport"
+  ];
+
+  if (blockedPhrases.some((phrase) => text.includes(phrase))) {
+    return false;
+  }
+
+  const blockedIntents = ["tell me about", "what is", "who is", "how to", "explain"];
+  return !blockedIntents.some((phrase) => text.includes(phrase));
+}
+
 async function checkImageClarity(file: File): Promise<{ ok: boolean; message?: string }> {
   if (!file.type.startsWith("image/")) {
     return { ok: true };
@@ -257,6 +287,11 @@ export default function App() {
 
     if (!hasDescription && !hasFile) {
       setScanError("Provide a detailed description or upload a clear image to begin.");
+      return;
+    }
+
+    if (hasDescription && !isGoodsRelatedDescription(description)) {
+      setScanError("This tool only supports HS code classification for goods. Please provide a specific item description.");
       return;
     }
 

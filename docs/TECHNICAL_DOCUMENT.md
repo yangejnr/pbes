@@ -85,6 +85,7 @@ Each match includes:
 - Description must be specific (length and word count check).
 - Allowed files: PDF, JPEG, PNG.
 - Image clarity enforcement (size threshold).
+- Non-goods queries are rejected with a polite guidance message.
 
 ## 8. Security
 - JWT-based authentication for officers.
