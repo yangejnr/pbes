@@ -82,9 +82,15 @@ The NCS HS Code Intelligence Tool is a web-based system for HS code classificati
     - `imageBase64` (string, optional)
     - `sourceSystem` (string, optional)
   - Response:
-    - `{ status: "completed", matches, note }`
-    - `{ status: "needs_more_detail", message }`
-    - `{ status: "rejected", message }`
+    - `202 Accepted { requestId, status: "accepted", jobId }`
+    - `{ requestId, status: "needs_more_detail", message }`
+    - `{ requestId, status: "rejected", message }`
+
+- **GET** `/api/integrations/hscode/scan/{jobId}`
+  - Response:
+    - `{ requestId, status: "pending" }`
+    - `{ requestId, status: "completed", matches, note }`
+    - `{ requestId, status: "failed", message }`
 
 ## 6. HS Code Output Structure
 Each match includes:
@@ -95,7 +101,7 @@ Each match includes:
 - **Subsections** (HS code, title, notes)
 
 ## 7. Input Validation
-- Description must be specific (length and word count check).
+- Short descriptions are accepted, but specificity improves accuracy.
 - Allowed files: PDF, JPEG, PNG.
 - Image clarity enforcement (size threshold).
 - Non-goods queries are rejected with a polite guidance message.

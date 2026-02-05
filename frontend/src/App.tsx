@@ -50,8 +50,7 @@ const featureCards: { title: string; description: string; icon: ReactNode }[] = 
 ];
 
 function isDescriptionSpecific(description: string): boolean {
-  const words = description.trim().split(/\s+/).filter(Boolean);
-  return words.length >= 5 && description.trim().length >= 25;
+  return description.trim().length > 0;
 }
 
 function isGoodsRelatedDescription(description: string): boolean {

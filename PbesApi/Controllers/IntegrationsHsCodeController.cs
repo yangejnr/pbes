@@ -23,16 +23,17 @@ public class IntegrationsHsCodeController : ControllerBase
     }
 
     [HttpPost("scan")]
-    public async Task<IActionResult> Scan([FromBody] IntegrationHsCodeScanRequest request, CancellationToken cancellationToken)
+    public IActionResult Scan([FromBody] IntegrationHsCodeScanRequest request)
     {
         var description = request.Description?.Trim();
         var imageBase64 = HsCodeValidation.NormalizeImageBase64(request.ImageBase64);
 
         if (string.IsNullOrWhiteSpace(description) && string.IsNullOrWhiteSpace(imageBase64))
         {
-            return Ok(new IntegrationHsCodeScanResponse(
+            return Ok(new IntegrationHsCodeScanStatusResponse(
                 request.RequestId,
                 "rejected",
+                null,
                 null,
                 null,
                 "Provide a detailed description or image to begin."));
@@ -40,9 +41,10 @@ public class IntegrationsHsCodeController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(description) && !HsCodeValidation.IsGoodsRelated(description))
         {
-            return Ok(new IntegrationHsCodeScanResponse(
+            return Ok(new IntegrationHsCodeScanStatusResponse(
                 request.RequestId,
                 "rejected",
+                null,
                 null,
                 null,
                 "This tool only supports HS code classification for goods. Please provide a specific item description."));
@@ -50,52 +52,88 @@ public class IntegrationsHsCodeController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(description) && !HsCodeValidation.IsDescriptionSpecific(description))
         {
-            return Ok(new IntegrationHsCodeScanResponse(
+            return Ok(new IntegrationHsCodeScanStatusResponse(
                 request.RequestId,
                 "needs_more_detail",
+                null,
                 null,
                 null,
                 "Please provide a more specific description (material, use, size, brand, etc.)."));
         }
 
-        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var job = _scanStore.CreateJob(request.RequestId);
 
-        try
+        _ = Task.Run(async () =>
         {
-            var modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, linkedCts.Token);
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_options.TimeoutSeconds));
 
-            if (modelResponse.Matches.Count > 0)
+            try
             {
-                var top = modelResponse.Matches[0];
-                _scanStore.Add(new RecentHsCodeEntry(top.HsCode, top.Description));
-            }
+                var modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, timeoutCts.Token);
 
-            return Ok(new IntegrationHsCodeScanResponse(
-                request.RequestId,
+                if (modelResponse.Matches.Count > 0)
+                {
+                    var top = modelResponse.Matches[0];
+                    _scanStore.Add(new RecentHsCodeEntry(top.HsCode, top.Description));
+                }
+
+                var response = new HsCodeScanResponse(
+                    modelResponse.Matches,
+                    modelResponse.Note,
+                    _scanStore.GetRecent());
+
+                _scanStore.CompleteJob(job.Id, response);
+            }
+            catch (OperationCanceledException)
+            {
+                _scanStore.FailJob(job.Id, "HS code scan timed out. Try a shorter description or smaller image.");
+            }
+            catch (Exception)
+            {
+                _scanStore.FailJob(job.Id, "HS code scan failed.");
+            }
+        });
+
+        return Accepted(new IntegrationHsCodeScanStartResponse(request.RequestId, "accepted", job.Id));
+    }
+
+    [HttpGet("scan/{jobId:guid}")]
+    public IActionResult GetScanStatus(Guid jobId)
+    {
+        if (!_scanStore.TryGetJob(jobId, out var job))
+        {
+            return NotFound("Scan job not found.");
+        }
+
+        if (job.Status == HsCodeScanJobStatus.Completed)
+        {
+            return Ok(new IntegrationHsCodeScanStatusResponse(
+                job.RequestId,
                 "completed",
-                modelResponse.Matches,
-                modelResponse.Note,
+                job.Id,
+                job.Result?.Matches,
+                job.Result?.Note,
                 null));
         }
-        catch (OperationCanceledException)
+
+        if (job.Status == HsCodeScanJobStatus.Failed)
         {
-            return Ok(new IntegrationHsCodeScanResponse(
-                request.RequestId,
+            return Ok(new IntegrationHsCodeScanStatusResponse(
+                job.RequestId,
                 "failed",
+                job.Id,
                 null,
                 null,
-                "HS code scan timed out. Try a shorter description or smaller image."));
+                job.Error));
         }
-        catch (Exception)
-        {
-            return Ok(new IntegrationHsCodeScanResponse(
-                request.RequestId,
-                "failed",
-                null,
-                null,
-                "HS code scan failed."));
-        }
+
+        return Ok(new IntegrationHsCodeScanStatusResponse(
+            job.RequestId,
+            "pending",
+            job.Id,
+            null,
+            null,
+            null));
     }
 }
 
@@ -105,9 +143,15 @@ public record IntegrationHsCodeScanRequest(
     string? ImageBase64,
     string? SourceSystem);
 
-public record IntegrationHsCodeScanResponse(
+public record IntegrationHsCodeScanStartResponse(
     string? RequestId,
     string Status,
+    Guid JobId);
+
+public record IntegrationHsCodeScanStatusResponse(
+    string? RequestId,
+    string Status,
+    Guid? JobId,
     List<HsCodeMatch>? Matches,
     string? Note,
     string? Message);

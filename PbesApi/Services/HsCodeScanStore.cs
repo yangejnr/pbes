@@ -35,10 +35,10 @@ public class HsCodeScanStore
         }
     }
 
-    public HsCodeScanJob CreateJob()
+    public HsCodeScanJob CreateJob(string? requestId = null)
     {
         CleanupJobs();
-        var job = new HsCodeScanJob(Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var job = new HsCodeScanJob(Guid.NewGuid(), DateTimeOffset.UtcNow, requestId);
         _jobs[job.Id] = job;
         return job;
     }

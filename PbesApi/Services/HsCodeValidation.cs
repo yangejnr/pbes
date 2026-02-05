@@ -9,8 +9,7 @@ public static class HsCodeValidation
 
     public static bool IsDescriptionSpecific(string description)
     {
-        var words = description.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        return words.Length >= 5 && description.Length >= 25;
+        return !string.IsNullOrWhiteSpace(description);
     }
 
     public static bool IsGoodsRelated(string description)
