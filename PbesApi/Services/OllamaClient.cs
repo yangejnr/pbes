@@ -110,25 +110,81 @@ public class OllamaClient : IOllamaClient
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
         using var document = JsonDocument.Parse(responseJson);
-        var content = document.RootElement.GetProperty("message").GetProperty("content").GetString();
+        var messageElement = document.RootElement.GetProperty("message").GetProperty("content");
 
+        if (messageElement.ValueKind == JsonValueKind.Object || messageElement.ValueKind == JsonValueKind.Array)
+        {
+            var raw = messageElement.GetRawText();
+            return TryDeserializeResponse(raw) ??
+                   new HsCodeModelResponse(new List<HsCodeMatch>(), "Unable to parse model response. Please refine the item description.");
+        }
+
+        var content = messageElement.ValueKind == JsonValueKind.String ? messageElement.GetString() : null;
         if (string.IsNullOrWhiteSpace(content))
         {
             return new HsCodeModelResponse(new List<HsCodeMatch>(), "No response from model.");
         }
 
+        content = content.Trim();
+        content = StripCodeFences(content);
+
+        return TryDeserializeResponse(content) ??
+               TryDeserializeResponse(ExtractJsonObject(content)) ??
+               new HsCodeModelResponse(new List<HsCodeMatch>(), "Unable to parse model response. Please refine the item description.");
+    }
+
+    private static HsCodeModelResponse? TryDeserializeResponse(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
         try
         {
-            var modelResponse = JsonSerializer.Deserialize<HsCodeModelResponse>(content, new JsonSerializerOptions
+            return JsonSerializer.Deserialize<HsCodeModelResponse>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
-
-            return modelResponse ?? new HsCodeModelResponse(new List<HsCodeMatch>(), "Unable to parse model response.");
         }
         catch (JsonException)
         {
-            return new HsCodeModelResponse(new List<HsCodeMatch>(), "Invalid model response format.");
+            return null;
         }
+    }
+
+    private static string? ExtractJsonObject(string content)
+    {
+        var start = content.IndexOf('{');
+        var end = content.LastIndexOf('}');
+        if (start < 0 || end <= start)
+        {
+            return null;
+        }
+
+        return content[start..(end + 1)];
+    }
+
+    private static string StripCodeFences(string content)
+    {
+        if (!content.StartsWith("```", StringComparison.Ordinal))
+        {
+            return content;
+        }
+
+        var firstNewline = content.IndexOf('\n');
+        if (firstNewline < 0)
+        {
+            return content;
+        }
+
+        var stripped = content[(firstNewline + 1)..];
+        var lastFence = stripped.LastIndexOf("```", StringComparison.Ordinal);
+        if (lastFence >= 0)
+        {
+            stripped = stripped[..lastFence];
+        }
+
+        return stripped.Trim();
     }
 }

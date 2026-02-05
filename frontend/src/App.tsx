@@ -80,21 +80,26 @@ function isGoodsRelatedDescription(description: string): boolean {
     return false;
   }
 
-  const blockedIntents = ["tell me about", "what is", "who is", "how to", "explain"];
-  return !blockedIntents.some((phrase) => text.includes(phrase));
+  return true;
 }
 
-async function checkImageClarity(file: File): Promise<{ ok: boolean; message?: string }> {
+async function checkImageClarity(
+  file: File,
+  source: "upload" | "camera" = "upload"
+): Promise<{ ok: boolean; message?: string }> {
   if (!file.type.startsWith("image/")) {
     return { ok: true };
   }
 
-  if (file.size < 80 * 1024) {
+  const minSize = source === "camera" ? 60 * 1024 : 80 * 1024;
+  if (file.size < minSize) {
     return { ok: false, message: "Image appears too small. Upload a clearer photo with more detail." };
   }
 
   const imageBitmap = await createImageBitmap(file);
-  if (imageBitmap.width < 900 || imageBitmap.height < 600) {
+  const minWidth = source === "camera" ? 640 : 900;
+  const minHeight = source === "camera" ? 480 : 600;
+  if (imageBitmap.width < minWidth || imageBitmap.height < minHeight) {
     return { ok: false, message: "Image resolution is low. Please upload a clearer image." };
   }
 
@@ -164,7 +169,7 @@ export default function App() {
     return `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB`;
   }, [selectedFile]);
 
-  const handleFileSelect = async (file: File | null) => {
+  const handleFileSelect = async (file: File | null, source: "upload" | "camera" = "upload") => {
     setScanError(null);
     setScanResults(null);
     setScanNote(null);
@@ -182,7 +187,7 @@ export default function App() {
       return;
     }
 
-    const clarity = await checkImageClarity(file);
+    const clarity = await checkImageClarity(file, source);
     if (!clarity.ok) {
       setScanError(clarity.message ?? "Please upload a clearer image.");
       return;
@@ -222,7 +227,13 @@ export default function App() {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
       streamRef.current = stream;
       setIsCameraOpen(true);
     } catch (error) {
@@ -234,9 +245,19 @@ export default function App() {
     if (!videoRef.current) return;
     const video = videoRef.current;
 
+    if (video.videoWidth < 2 || video.videoHeight < 2) {
+      setCameraError("Camera is still loading. Please wait a moment and try again.");
+      return;
+    }
+
+    const track = streamRef.current?.getVideoTracks()[0];
+    const settings = track?.getSettings();
+    const width = video.videoWidth || settings?.width || 1280;
+    const height = video.videoHeight || settings?.height || 720;
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) return;
 
@@ -245,7 +266,7 @@ export default function App() {
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       const file = new File([blob], "camera-capture.png", { type: "image/png" });
-      await handleFileSelect(file);
+      await handleFileSelect(file, "camera");
       stopCamera();
     }, "image/png");
   };

@@ -73,6 +73,19 @@ The NCS HS Code Intelligence Tool is a web-based system for HS code classificati
 - **GET** `/api/hscode/recent`
   - Response: List of last 10 HS codes and descriptions
 
+### 5.3 Integration API (Main System)
+- **POST** `/api/integrations/hscode/scan`
+  - Content-Type: `application/json`
+  - Request body:
+    - `requestId` (string, optional)
+    - `description` (string, optional)
+    - `imageBase64` (string, optional)
+    - `sourceSystem` (string, optional)
+  - Response:
+    - `{ status: "completed", matches, note }`
+    - `{ status: "needs_more_detail", message }`
+    - `{ status: "rejected", message }`
+
 ## 6. HS Code Output Structure
 Each match includes:
 - **HS Code**
