@@ -11,10 +11,8 @@ Required first-row headings (minimum):
 - other columns like `SU`, `ID`, `VA`, `LXY`, etc.
 
 HS code normalization rule used by the API:
-- Input like `0101210000` is formatted as `010121.00.00`
-- First 6 digits = global
-- Next 2 digits = regional
-- Last 2 digits = country
+- Input like `0101210000` is formatted as `0101.21.00.00`
+- First 4 digits, then 2 digits, then 2 digits, then 2 digits
 
 Response rule used by the API:
 - Returns only columns with values

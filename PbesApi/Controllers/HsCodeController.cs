@@ -89,7 +89,7 @@ public class HsCodeController : ControllerBase
             try
             {
                 var modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, linkedCts.Token);
-                var enrichedMatches = _enrichmentService.Enrich(modelResponse.Matches);
+                var enrichedMatches = _enrichmentService.Enrich(modelResponse.Matches, description);
 
                 if (enrichedMatches.Count > 0)
                 {

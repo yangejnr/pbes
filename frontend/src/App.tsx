@@ -49,6 +49,23 @@ const featureCards: { title: string; description: string; icon: ReactNode }[] = 
   }
 ];
 
+const levyDescriptions: Record<string, string> = {
+  WFL: "Wheat Flour levy",
+  WGL: "Wheat Grain levy",
+  RIC: "Rice levy",
+  BRL: "Brown Rice levy",
+  SUG: "Sugar levy",
+  CEM: "Cement levy",
+  CIG: "Cigarette levy",
+  IRO: "Iron/Steel levy",
+  CRT: "Copyright levy",
+  TPL: "Tomato paste levy",
+  ETLS: "ECOWAS Liberalisation Scheme levy",
+  NAN: "National Automotive Development & Design Council levy",
+  TXT: "Textile levy",
+  RES: "Re-exporting Surcharge levy"
+};
+
 function isDescriptionSpecific(description: string): boolean {
   return description.trim().length > 0;
 }
@@ -168,27 +185,36 @@ export default function App() {
     return `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB`;
   }, [selectedFile]);
 
-  const getChargeEntries = (result: HsCodeMatch): Array<[string, string]> => {
+  const getChargeEntries = (result: HsCodeMatch): Array<{ code: string; label: string; value: string }> => {
     const columns = result.ragColumns ?? {};
     const excluded = new Set(["hscode", "description"]);
-    return Object.entries(columns).filter(([key, value]) => {
-      const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
-      if (excluded.has(normalizedKey)) {
-        return false;
-      }
+    return Object.entries(columns)
+      .filter(([key, value]) => {
+        const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+        if (excluded.has(normalizedKey)) {
+          return false;
+        }
 
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return false;
-      }
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return false;
+        }
 
-      const numeric = trimmed.replace(/,/g, "").replace(/%/g, "");
-      if (/^-?\d+(\.\d+)?$/.test(numeric) && Number(numeric) === 0) {
-        return false;
-      }
+        const numeric = trimmed.replace(/,/g, "").replace(/%/g, "");
+        if (/^-?\d+(\.\d+)?$/.test(numeric) && Number(numeric) === 0) {
+          return false;
+        }
 
-      return true;
-    });
+        return true;
+      })
+      .map(([key, value]) => {
+        const levy = levyDescriptions[key.toUpperCase()];
+        return {
+          code: key,
+          label: levy ? `${key} - ${levy}` : key,
+          value
+        };
+      });
   };
 
   const handleFileSelect = async (file: File | null, source: "upload" | "camera" = "upload") => {
@@ -720,15 +746,15 @@ export default function App() {
                       <table className="w-full text-left text-xs">
                         <thead className="bg-ncsLight text-neutral-500">
                           <tr>
-                            <th className="px-3 py-2 uppercase tracking-wide">Column</th>
+                            <th className="px-3 py-2 uppercase tracking-wide">Description</th>
                             <th className="px-3 py-2 uppercase tracking-wide">Value</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {getChargeEntries(selectedResult).map(([key, value]) => (
-                            <tr key={key} className="border-t border-ncsBorder text-neutral-700">
-                              <td className="px-3 py-2 font-semibold text-ncsInk">{key}</td>
-                              <td className="px-3 py-2">{value}</td>
+                          {getChargeEntries(selectedResult).map((entry) => (
+                            <tr key={entry.code} className="border-t border-ncsBorder text-neutral-700">
+                              <td className="px-3 py-2 font-semibold text-ncsInk">{entry.label}</td>
+                              <td className="px-3 py-2">{entry.value}</td>
                             </tr>
                           ))}
                         </tbody>

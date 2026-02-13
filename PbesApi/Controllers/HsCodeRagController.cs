@@ -6,6 +6,7 @@ namespace PbesApi.Controllers;
 
 [ApiController]
 [Route("api/hscode/rag")]
+[Route("api/integrations/hscode/rag")]
 public class HsCodeRagController : ControllerBase
 {
     private readonly HsCodeRagService _ragService;

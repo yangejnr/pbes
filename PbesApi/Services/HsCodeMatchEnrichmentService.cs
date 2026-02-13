@@ -11,7 +11,7 @@ public class HsCodeMatchEnrichmentService
         _ragService = ragService;
     }
 
-    public List<HsCodeMatch> Enrich(List<HsCodeMatch>? matches)
+    public List<HsCodeMatch> Enrich(List<HsCodeMatch>? matches, string? queryContext = null)
     {
         if (matches is null || matches.Count == 0)
         {
@@ -25,6 +25,18 @@ public class HsCodeMatchEnrichmentService
             var normalized = HsCodeRagService.FormatHsCode(match.HsCode) ?? match.HsCode;
             var ragRow = _ragService.LookupByHsCode(normalized);
             var ragColumns = ragRow?.Columns;
+            var validatedByCode = ragColumns is not null && ragColumns.Count > 0;
+
+            if (!validatedByCode)
+            {
+                var fallback = _ragService.FindBestByDescription(queryContext) ??
+                               _ragService.FindBestByDescription(match.Description);
+                if (fallback?.Columns is not null && fallback.Columns.Count > 0)
+                {
+                    ragColumns = fallback.Columns;
+                }
+            }
+
             var validated = ragColumns is not null && ragColumns.Count > 0;
             var canonicalHsCode = ExtractColumn(ragColumns, "HS Code") ??
                                   ExtractColumn(ragColumns, "HS code") ??

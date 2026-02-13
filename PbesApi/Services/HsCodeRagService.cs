@@ -90,6 +90,23 @@ public class HsCodeRagService
         }
     }
 
+    public HsCodeRagRowResponse? FindBestByDescription(string? query)
+    {
+        var trimmed = query?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        var result = Search(trimmed, 1);
+        if (result.Total <= 0 || result.Rows.Count == 0)
+        {
+            return null;
+        }
+
+        return result.Rows[0];
+    }
+
     private (bool Loaded, string Message, int RowCount) LoadInternal(bool force)
     {
         try
@@ -374,19 +391,22 @@ public class HsCodeRagService
         if (digits.Length >= 10)
         {
             digits = digits[..10];
-            return $"{digits[..6]}.{digits.Substring(6, 2)}.{digits.Substring(8, 2)}";
+            return $"{digits[..4]}.{digits.Substring(4, 2)}.{digits.Substring(6, 2)}.{digits.Substring(8, 2)}";
+        }
+
+        if (digits.Length > 8)
+        {
+            return $"{digits[..4]}.{digits.Substring(4, 2)}.{digits.Substring(6, 2)}.{digits[8..]}";
         }
 
         if (digits.Length > 6)
         {
-            var global = digits[..6];
-            var rest = digits[6..];
-            if (rest.Length > 2)
-            {
-                return $"{global}.{rest[..2]}.{rest[2..]}";
-            }
+            return $"{digits[..4]}.{digits.Substring(4, 2)}.{digits[6..]}";
+        }
 
-            return $"{global}.{rest}";
+        if (digits.Length > 4)
+        {
+            return $"{digits[..4]}.{digits[4..]}";
         }
 
         return digits;

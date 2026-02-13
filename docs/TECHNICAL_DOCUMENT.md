@@ -1,137 +1,107 @@
 # NCS HS Code Intelligence Tool – Technical Document
 
 ## 1. Overview
-The NCS HS Code Intelligence Tool is a web-based system for HS code classification support. It allows NCS officers to submit a detailed item description and/or a clear image, then returns likely HS code matches with descriptions, confidence, comments, and subsections. The system uses a local Llama model via Ollama for classification and keeps a recent scan summary for quick reference.
+The NCS HS Code Intelligence Tool is a web-based classification system for Nigeria Customs Service workflows. It combines AI-assisted HS code suggestions with Excel-based RAG validation and charge enrichment.
+
+The system supports:
+- Description-only scans
+- Description + image scans
+- Integration API requests from other systems
+- Canonical HS code normalization and levy/charge extraction from a local Excel source
 
 ## 2. Objectives
-- Provide fast, AI-assisted HS code classification support.
-- Support text-only and image-based submissions.
-- Enforce input quality (avoid vague descriptions and unclear images).
-- Maintain an audit-friendly “last 10 scans” summary.
+- Provide fast HS code recommendations.
+- Ensure returned HS codes are validated against internal tariff data.
+- Return only meaningful charge fields (non-empty, non-zero).
+- Provide clear operational endpoints for internal integrations.
 
 ## 3. Architecture
-### 3.1 High-Level Components
+### 3.1 Components
 - **Frontend (React + TypeScript + Tailwind)**
-  - Landing page and HS code scan modal.
-  - Upload and camera capture support.
-  - Results table and details modal.
-  - Recent scans summary.
+  - Scan modal, results table, details modal
+  - Charges display with levy abbreviation meanings
 - **Backend (.NET 8 Web API)**
-  - Handles scan requests and validation.
-  - Asynchronous job handling for scans.
-  - Calls local Ollama service.
-  - Returns structured HS code results.
+  - Async scan job orchestration
+  - Input validation
+  - Ollama integration
+  - RAG lookup, enrichment, and response shaping
+- **RAG Data Source (Excel)**
+  - File: `data/hs-rag/hs_code_rag.xlsx`
+  - Loaded via ClosedXML
 - **Ollama (Local Llama)**
-  - Text model: `llama3:8b`.
-  - Vision model: `llama3.2-vision`.
-- **Database (PostgreSQL)**
-  - Officers table for authentication (JWT-based login).
+  - Text model: `llama3:8b`
+  - Vision model: `llama3.2-vision`
+- **Gateway / Runtime**
+  - Nginx gateway
+  - Docker Compose services
+  - Optional ngrok exposure
 
-### 3.2 Data Flow (Scan)
-1. User submits description and/or image.
-2. Backend validates input (description specificity and image clarity).
-3. Backend creates an async scan job and returns `jobId`.
-4. Backend calls Ollama and builds structured JSON response.
-5. Frontend polls job status until complete.
-6. Results displayed in the UI and recent scans updated.
+### 3.2 Data Flow
+1. User submits scan request.
+2. Backend validates request and starts async job.
+3. Backend calls Ollama for candidate matches.
+4. Each match is enriched against RAG:
+   - Normalize HS code to canonical format.
+   - Attempt lookup by code.
+   - If code not found, fallback to best RAG description match (anchored to user query).
+5. Response returns canonical HS code/description + filtered charge columns.
 
-## 4. Tech Stack
-- **Frontend**: React, TypeScript, Tailwind CSS
-- **Backend**: .NET 8 Web API (C#)
-- **Database**: PostgreSQL
-- **ORM**: Entity Framework Core (Npgsql)
-- **Auth**: JWT
-- **AI**: Ollama (local Llama models)
-- **Gateway**: Nginx (reverse proxy)
-- **Deployment**: Docker, Docker Compose, AWS ECR
-- **Remote Access**: ngrok
+## 4. HS Code Normalization
+Canonical format is now:
+- **4 digits + dot + 2 digits + dot + 2 digits + dot + 2 digits**
+- Example: `0101210000` -> `0101.21.00.00`
 
-## 5. APIs
-### 5.1 Authentication
-- **POST** `/api/auth/login`
-  - Request: `{ serviceNumberOrEmail, password }`
-  - Response: `{ token, officerId, role }`
+This format is used consistently in RAG output and enriched scan responses.
 
-- **POST** `/api/auth/forgot-password`
-  - Request: `{ serviceNumberOrEmail }`
-  - Response: Stub
+## 5. RAG Rules
+- Required Excel columns include:
+  - `HS Code`
+  - `Description`
+  - Charges/levies columns (e.g. `SU`, `ID`, `VAT`, `WFL`, `ETLS`, etc.)
+- Output rules:
+  - Exclude empty values
+  - Exclude numeric zero values (`0`, `0.0`, `0.00`, `0%`)
+- Enrichment fields per match:
+  - `ragValidated` (boolean)
+  - `ragColumns` (key/value map of filtered columns)
 
-### 5.2 HS Code Scan
-- **POST** `/api/hscode/scan`
-  - Content-Type: `multipart/form-data`
-  - Fields:
-    - `description` (optional string)
-    - `file` (optional file: PDF/JPEG/PNG)
-  - Response: `202 Accepted { jobId }`
+## 6. API Summary
+Implemented endpoint groups:
+- Auth APIs: `/api/auth/*`
+- Core scan APIs: `/api/hscode/*`
+- Integration scan APIs: `/api/integrations/hscode/*`
+- RAG APIs:
+  - `/api/hscode/rag/*`
+  - `/api/integrations/hscode/rag/*` (alias for integration consumers)
 
-- **GET** `/api/hscode/scan/{jobId}`
-  - Response:
-    - `{ status: "pending" }`
-    - `{ status: "completed", result: { matches, note, recentHsCodes } }`
-    - `{ status: "failed", error }`
+Full endpoint details are documented in `docs/API_DOCUMENTATION.md`.
 
-- **GET** `/api/hscode/recent`
-  - Response: List of last 10 HS codes and descriptions
+## 7. Tech Stack
+- Frontend: React, TypeScript, Tailwind CSS, Vite
+- Backend: ASP.NET Core (.NET 8)
+- Data: PostgreSQL (officer auth data), Excel file (RAG tariff data)
+- AI: Ollama local models
+- Packaging: Docker / Docker Compose
+- Image registry: AWS ECR
 
-### 5.3 Integration API (Main System)
-- **POST** `/api/integrations/hscode/scan`
-  - Content-Type: `application/json`
-  - Request body:
-    - `requestId` (string, optional)
-    - `description` (string, optional)
-    - `imageBase64` (string, optional)
-    - `sourceSystem` (string, optional)
-  - Response:
-    - `202 Accepted { requestId, status: "accepted", jobId }`
-    - `{ requestId, status: "needs_more_detail", message }`
-    - `{ requestId, status: "rejected", message }`
+## 8. Deployment Notes
+- Backend requires mounted RAG folder:
+  - Compose mount: `./data:/data:ro`
+- Config key:
+  - `HsCodeRag:FilePath` (default `../data/hs-rag/hs_code_rag.xlsx` in container context)
+- Frontend and backend updates must be rebuilt/redeployed together when response structure/UI changes.
 
-- **GET** `/api/integrations/hscode/scan/{jobId}`
-  - Response:
-    - `{ requestId, status: "pending" }`
-    - `{ requestId, status: "completed", matches, note }`
-    - `{ requestId, status: "failed", message }`
+## 9. Security & Operations
+- JWT authentication for officer endpoints.
+- Password hashing via ASP.NET Identity password hasher.
+- Configurable secrets and DB connection via appsettings/environment variables.
+- Logs available through container logs and `/tmp` runtime logs for ngrok/ollama scripts.
 
-## 6. HS Code Output Structure
-Each match includes:
-- **HS Code**
-- **Description**
-- **Match %**
-- **Comment**
-- **Subsections** (HS code, title, notes)
+## 10. Known Constraints
+- AI model may produce semantically noisy candidates; RAG fallback mitigates but does not replace officer review.
+- Long-running scans depend on model/image complexity.
 
-## 7. Input Validation
-- Short descriptions are accepted, but specificity improves accuracy.
-- Allowed files: PDF, JPEG, PNG.
-- Image clarity enforcement (size threshold).
-- Non-goods queries are rejected with a polite guidance message.
-
-## 8. Security
-- JWT-based authentication for officers.
-- Password hashing via ASP.NET Core Identity hasher.
-- Configurable secrets in appsettings.
-
-## 9. Configuration
-### Key environment variables
-- `ConnectionStrings__PostgreSql`
-- `Ollama__BaseUrl`
-- `Ollama__Model`
-- `Ollama__TextModel`
-- `Ollama__TimeoutSeconds`
-
-## 10. Deployment (Docker)
-- **Backend** on port 8080
-- **Frontend** on port 3000
-- **Gateway** on port 8088
-- **Postgres** on internal port 5432
-- **ngrok** tunnels to 8088 for remote access
-
-## 11. Known Constraints
-- Long model inference times on large images.
-- Async polling required for stable UX over ngrok.
-
-## 12. Future Enhancements
-- Persistent scan history in DB.
-- Role-based access control for administrators.
-- Multi-model fallback strategy.
-- Exportable audit logs.
+## 11. Future Enhancements
+- Persist full scan/audit history to database.
+- Confidence blending model between AI score and RAG match score.
+- Admin tooling for RAG file versioning and validation report.
