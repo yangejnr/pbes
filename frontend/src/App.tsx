@@ -168,6 +168,29 @@ export default function App() {
     return `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(0)} KB`;
   }, [selectedFile]);
 
+  const getChargeEntries = (result: HsCodeMatch): Array<[string, string]> => {
+    const columns = result.ragColumns ?? {};
+    const excluded = new Set(["hscode", "description"]);
+    return Object.entries(columns).filter(([key, value]) => {
+      const normalizedKey = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
+      if (excluded.has(normalizedKey)) {
+        return false;
+      }
+
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return false;
+      }
+
+      const numeric = trimmed.replace(/,/g, "").replace(/%/g, "");
+      if (/^-?\d+(\.\d+)?$/.test(numeric) && Number(numeric) === 0) {
+        return false;
+      }
+
+      return true;
+    });
+  };
+
   const handleFileSelect = async (file: File | null, source: "upload" | "camera" = "upload") => {
     setScanError(null);
     setScanResults(null);
@@ -689,6 +712,31 @@ export default function App() {
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Comment</span>
                   <p className="mt-1">{selectedResult.comment}</p>
+                </div>
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Charges</span>
+                  {getChargeEntries(selectedResult).length ? (
+                    <div className="mt-3 overflow-x-auto rounded-xl border border-ncsBorder">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-ncsLight text-neutral-500">
+                          <tr>
+                            <th className="px-3 py-2 uppercase tracking-wide">Column</th>
+                            <th className="px-3 py-2 uppercase tracking-wide">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getChargeEntries(selectedResult).map(([key, value]) => (
+                            <tr key={key} className="border-t border-ncsBorder text-neutral-700">
+                              <td className="px-3 py-2 font-semibold text-ncsInk">{key}</td>
+                              <td className="px-3 py-2">{value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-neutral-500">No non-zero charges found in RAG data.</p>
+                  )}
                 </div>
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Sub-sections</span>

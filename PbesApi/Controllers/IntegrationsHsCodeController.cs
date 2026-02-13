@@ -10,15 +10,18 @@ public class IntegrationsHsCodeController : ControllerBase
 {
     private readonly IOllamaClient _ollamaClient;
     private readonly HsCodeScanStore _scanStore;
+    private readonly HsCodeMatchEnrichmentService _enrichmentService;
     private readonly OllamaOptions _options;
 
     public IntegrationsHsCodeController(
         IOllamaClient ollamaClient,
         HsCodeScanStore scanStore,
+        HsCodeMatchEnrichmentService enrichmentService,
         Microsoft.Extensions.Options.IOptions<OllamaOptions> options)
     {
         _ollamaClient = ollamaClient;
         _scanStore = scanStore;
+        _enrichmentService = enrichmentService;
         _options = options.Value;
     }
 
@@ -70,15 +73,16 @@ public class IntegrationsHsCodeController : ControllerBase
             try
             {
                 var modelResponse = await _ollamaClient.ScanAsync(description, imageBase64, timeoutCts.Token);
+                var enrichedMatches = _enrichmentService.Enrich(modelResponse.Matches);
 
-                if (modelResponse.Matches.Count > 0)
+                if (enrichedMatches.Count > 0)
                 {
-                    var top = modelResponse.Matches[0];
+                    var top = enrichedMatches[0];
                     _scanStore.Add(new RecentHsCodeEntry(top.HsCode, top.Description));
                 }
 
                 var response = new HsCodeScanResponse(
-                    modelResponse.Matches,
+                    enrichedMatches,
                     modelResponse.Note,
                     _scanStore.GetRecent());
 

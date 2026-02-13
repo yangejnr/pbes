@@ -3,6 +3,8 @@ services:
     image: 169136975305.dkr.ecr.eu-west-2.amazonaws.com/ncs-hs-backend:latest
     ports:
       - "8080:8080"
+    volumes:
+      - ./data:/data:ro
     environment:
       ASPNETCORE_URLS: http://0.0.0.0:8080
       ConnectionStrings__PostgreSql: Host=postgres;Port=5432;Database=pbes;Username=postgres;Password=Yange@junior1

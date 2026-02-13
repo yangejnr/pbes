@@ -51,6 +51,7 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 
 // Ollama HS code scanning
 builder.Services.Configure<OllamaOptions>(builder.Configuration.GetSection("Ollama"));
+builder.Services.Configure<HsCodeRagOptions>(builder.Configuration.GetSection("HsCodeRag"));
 builder.Services.AddHttpClient<IOllamaClient, OllamaClient>((serviceProvider, client) =>
 {
     var options = serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
@@ -58,6 +59,8 @@ builder.Services.AddHttpClient<IOllamaClient, OllamaClient>((serviceProvider, cl
     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
 });
 builder.Services.AddSingleton<HsCodeScanStore>();
+builder.Services.AddSingleton<HsCodeRagService>();
+builder.Services.AddSingleton<HsCodeMatchEnrichmentService>();
 
 // CORS for local frontend
 builder.Services.AddCors(options =>

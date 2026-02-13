@@ -9,6 +9,8 @@ export type HsCodeMatch = {
   description: string;
   matchPercent: number;
   comment: string;
+  ragValidated?: boolean;
+  ragColumns?: Record<string, string> | null;
   subsections: {
     hsCode: string;
     title: string;

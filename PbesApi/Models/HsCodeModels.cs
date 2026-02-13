@@ -7,7 +7,9 @@ public record HsCodeMatch(
     string Description,
     double MatchPercent,
     string Comment,
-    List<HsCodeSubsection> Subsections);
+    List<HsCodeSubsection> Subsections,
+    Dictionary<string, string>? RagColumns = null,
+    bool RagValidated = false);
 
 public record RecentHsCodeEntry(string HsCode, string Description);
 
